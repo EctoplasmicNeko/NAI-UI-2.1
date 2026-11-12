@@ -1,0 +1,102 @@
+{
+  "nameID": "Ecto",
+  "full_name": "Ectoplasmic Neko",
+  "c_positive": [
+    {
+      "tag": "girl",
+      "strength": 1.0
+    },
+    {
+      "tag": "pale skin",
+      "strength": 1.0
+    },
+    {
+      "tag": "pale blue hair",
+      "strength": 1.0
+    },
+    {
+      "tag": "blank white eye",
+      "strength": 1.0
+    },
+    {
+      "tag": "cat ears",
+      "strength": 1.0
+    },
+    {
+      "tag": "glowing blue",
+      "strength": 1.0
+    },
+    {
+      "tag": "flaming tail",
+      "strength": 1.0
+    },
+    {
+      "tag": "blue flames on tail",
+      "strength": 1.0
+    },
+    {
+      "tag": "long hair",
+      "strength": 1.0
+    }
+  ],
+  "c_negative": [],
+  "g_positive": "",
+  "g_negative": "",
+  "exclusive_chance_tag": "",
+  "non_exclusive_chance_tag": "",
+  "age": "???",
+  "gender": "Female",
+  "species": "Dead Felinid",
+  "subspecies": "Poltergeist",
+  "species icon": "Cat",
+  "tags": [],
+  "quick_weights": [
+    {
+      "max": 3,
+      "min": -3,
+      "negative": false,
+      "tag": "test1",
+      "value": 0
+    },
+    {
+      "max": 3,
+      "min": -3,
+      "negative": false,
+      "tag": "test2",
+      "value": 0
+    },
+    {
+      "max": 3,
+      "min": -3,
+      "negative": false,
+      "tag": "test3",
+      "value": 0
+    },
+    {
+      "max": 3,
+      "min": -3,
+      "negative": false,
+      "tag": "test4",
+      "value": 0
+    }
+  ],
+  "quotes": [
+    "ghost cat noises"
+  ],
+  "outfits": [
+    {
+      "name": "Warm Weather Casual",
+      "description": "A sleeveless hoodie in smoky gray, gauzy skirt that moves like mist, and bare feet.",
+      "o_positive": "sleeveless hoodie, gauzy skirt, gray fabric, airy material, ghostly theme",
+      "o_negative": ""
+    },
+    {
+      "name": "Cold Weather Casual",
+      "description": "A long spectral cloak with faded blue runes, worn over a layered dress of gauze and linen.",
+      "o_positive": "spectral cloak, runic markings, gauze fabric, layered linen, magical cold weather wear",
+      "o_negative": ""
+    }
+  ],
+  "most_recent_outfit": "Warm Weather Casual",
+  "tag_associations": []
+}
