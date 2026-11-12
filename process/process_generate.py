@@ -1,0 +1,503 @@
+import random
+from process.base64 import padded_image_to_b64
+from process.metadata import prepare_metadata
+from process.process_vibes import identify_vibe_images
+from windows.error import Error
+
+def prepare_generate_payload(state):
+    version = state['generate']['payload_type']
+    if version == 'v3':
+        payload, metadata = prepare_v3_payload(state, version)
+
+    elif version == 'v4':
+       payload, metadata = prepare_v4_payload(state, version)
+        
+    elif version == 'v45':
+        payload, metadata = prepare_v45_payload(state, version)
+
+    return payload, metadata
+
+
+def prepare_v3_payload(state, version):
+
+    positive_prompt = prepare_positive_prompt(state, version)
+    negative_prompt = prepare_negative_prompt(state, version)
+    brownian = prepare_brownian(state)
+    seed = generate_seed(state)
+    cfg = prepare_cfg(state)
+    payload = {
+    "action": "generate",
+    "input": positive_prompt,
+    "model": state['generate']['payload_name'],
+    "parameters": {
+        "add_original_image": True,
+        "cfg_rescale": state['generate']['rescale'],
+        "controlnet_strength": 1,
+        "dynamic_thresholding": state['generate']['decrisp'],
+        "height": state['generate']['image_height'],
+        "legacy_v3_extend": state['generate']['legacy_v3'],
+        "n_samples": 1,
+        "negative_prompt": negative_prompt,
+        "noise_schedule": state['generate']['schedule'],
+        "sampler": state['generate']['sampler'],
+        "scale": state['generate']['scale'],
+        "seed": seed,
+        "sm": state['generate']['SMEA'],
+        "sm_dyn": state['generate']['DYN'],
+        "steps": state['generate']['steps'],
+        "width": state['generate']['image_width'],
+        "skip_cfg_above_sigma":cfg,
+        "deliberate_euler_ancestral_bug": brownian[1],
+        "prefer_brownian": brownian[0]
+    }
+}
+    metadata = prepare_metadata(state, payload)
+    return payload, metadata
+
+def prepare_v4_payload(state, version):
+        
+    positive_prompt = prepare_positive_prompt(state, version)
+    negative_prompt = prepare_negative_prompt(state, version)
+    positive_character_captions = prepare_positive_character_prompt(state)
+    negative_character_captions = prepare_negative_character_prompt(state)
+    seed = generate_seed(state)
+    cfg = prepare_cfg(state)
+    brownian = prepare_brownian(state)
+
+    if state['vibe']['vibe_enabled'] and state['vibe']['reference_image_paths'] != []:
+        vibe_encodings = identify_vibe_images(state)
+        vibe_reference_strength = state['vibe']['reference_strengths']
+        vibe_normalize_strength = state['vibe']['normalize_strength']
+        
+    else:
+        vibe_encodings = []
+        vibe_reference_strength = []
+        vibe_normalize_strength = False
+
+    payload = {
+    "action": "generate",
+    "input": positive_prompt,
+    "model": state['generate']['payload_name'],
+    "parameters": {
+        "add_original_image": True,
+        "cfg_rescale": state['generate']['rescale'],
+        "legacy_uc": state['generate']['legacy_v4'],
+        "controlnet_strength": 1,
+        "deliberate_euler_ancestral_bug": brownian[1],
+        "prefer_brownian": brownian[0],
+        "dynamic_thresholding": False,
+        "height": state['generate']['image_height'],
+        "width": state['generate']['image_width'],
+        "n_samples": 1,
+        "negative_prompt": negative_prompt,
+        "noise_schedule": state['generate']['schedule'],
+        "sampler": state['generate']['sampler'],
+        "scale": state['generate']['scale'],
+        "seed": seed,
+        "normalize_reference_strength_multiple": vibe_normalize_strength,
+        "reference_strength_multiple": vibe_reference_strength,
+        "reference_image_multiple": vibe_encodings,
+        "skip_cfg_above_sigma": cfg,
+        "steps": state['generate']['steps'],
+        "use_coords": True,
+        "v4_negative_prompt": {
+            "caption": {
+                "base_caption": negative_prompt,
+                "char_captions": negative_character_captions
+            },
+            "legacy_uc": state['generate']['legacy_v4']
+        },
+        "v4_prompt": {
+            "caption": {
+                "base_caption": positive_prompt,
+                "char_captions": positive_character_captions
+            },
+            "use_coords": False,
+            "use_order": True
+        },
+    }
+}
+    metadata = prepare_metadata(state, payload)
+    return payload, metadata
+
+def prepare_v45_payload(state, version):
+        
+    positive_prompt = prepare_positive_prompt(state, version)
+    negative_prompt = prepare_negative_prompt(state, version)
+    positive_character_captions = prepare_positive_character_prompt(state)
+    negative_character_captions = prepare_negative_character_prompt(state)
+    seed = generate_seed(state)
+    cfg = prepare_cfg(state)
+    brownian = prepare_brownian(state)
+
+    if state['vibe']['vibe_enabled'] and state['vibe']['reference_image_paths'] != []:
+        vibe_encodings = identify_vibe_images(state)
+        vibe_reference_strength = state['vibe']['reference_strengths']
+        vibe_normalize_strength = state['vibe']['normalize_strength']
+        using_vibe = True
+        
+    else:
+        vibe_encodings = []
+        vibe_reference_strength = []
+        vibe_normalize_strength = False
+    
+
+    if state['character_1']['character_reference_enabled'] and state['character_1']['character_reference_path'] != None:
+        if using_vibe:
+            Error(None, "Vibe and Character Reference cannot be used together. Generation payload not created.")
+            return None, None
+
+        referenceb64 = padded_image_to_b64(state['character_1']['character_reference_path'])
+        fidelity = float(state['character_1']['character_reference_fidelity'])
+        styleaware = state['character_1']['character_reference_style_aware']
+        refstrength = state['character_1']['character_reference_strength']
+        
+        payload = {
+        "action": "generate",
+        "input": positive_prompt, 
+        "model": state['generate']['payload_name'],
+        "parameters": {
+            "add_original_image": True,
+            "cfg_rescale": state['generate']['rescale'],
+            "controlnet_strength": 1,
+            "deliberate_euler_ancestral_bug": brownian[1],
+            "prefer_brownian": brownian[0],
+            "dynamic_thresholding": False, 
+            "height": state['generate']['image_height'],
+            "width": state['generate']['image_width'],
+            "n_samples": 1,
+            "negative_prompt": negative_prompt,
+            "noise_schedule": state['generate']['schedule'],
+            "sampler": state['generate']['sampler'],
+            "scale": state['generate']['scale'],
+            "seed": seed,
+            "skip_cfg_above_sigma": cfg,
+            "steps": state['generate']['steps'],
+            "normalize_reference_strength_multiple": vibe_normalize_strength,
+            "reference_strength_multiple": vibe_reference_strength,
+            "reference_image_multiple": vibe_encodings,
+            "use_coords": True,
+            "v4_negative_prompt": {
+                "caption": {
+                    "base_caption": negative_prompt,
+                    "char_captions": negative_character_captions
+                }
+            },
+            "v4_prompt": {
+                "caption": {
+                    "base_caption": positive_prompt,
+                    "char_captions": positive_character_captions
+                },
+                "use_coords": False,
+                "use_order": True
+            },
+            
+        "director_reference_descriptions": [{
+            "caption": {
+                "base_caption": styleaware,
+                "char_captions": []
+            },
+            "legacy_uc": False
+        }],
+        "director_reference_images": [referenceb64],
+        "director_reference_information_extracted": [1],
+        "director_reference_secondary_strength_values": [fidelity],
+        "director_reference_strength_values": [refstrength]
+            
+        }
+    }
+        
+        metadata = prepare_metadata(state, payload)
+        return payload, metadata
+
+        
+    else:
+        payload = {
+        "action": "generate",
+        "input": positive_prompt, 
+        "model": state['generate']['payload_name'],
+        "parameters": {
+            "add_original_image": True,
+            "cfg_rescale": state['generate']['rescale'],
+            "controlnet_strength": 1,
+            "deliberate_euler_ancestral_bug": brownian[1],
+            "prefer_brownian": brownian[0],
+            "dynamic_thresholding": False, 
+            "height": state['generate']['image_height'],
+            "width": state['generate']['image_width'],
+            "n_samples": 1,
+            "negative_prompt": negative_prompt,
+            "noise_schedule": state['generate']['schedule'],
+            "sampler": state['generate']['sampler'],
+            "scale": state['generate']['scale'],
+            "seed": seed,
+            "normalize_reference_strength_multiple": vibe_normalize_strength,
+            "reference_strength_multiple": vibe_reference_strength,
+            "reference_image_multiple": vibe_encodings,
+            "skip_cfg_above_sigma": cfg,
+            "steps": state['generate']['steps'],
+            "use_coords": True,
+            "v4_negative_prompt": {
+                "caption": {
+                    "base_caption": negative_prompt,
+                    "char_captions": negative_character_captions
+                }
+            },
+            "v4_prompt": {
+                "caption": {
+                    "base_caption": positive_prompt,
+                    "char_captions": positive_character_captions
+                },
+                "use_coords": False,
+                "use_order": True
+            },
+        }
+    }
+        
+
+        metadata = prepare_metadata(state, payload)
+        return payload, metadata
+
+
+
+def prepare_positive_prompt(state, version):
+    prompt = []
+    preset = state['global_prompt']['global_positive_preset_tags']
+    target = state['global_prompt']['global_positive_preset_target']
+    character_count = state['global_prompt']['character_number']
+
+    global_positive_prompt = state['global_prompt']['global_positive_prompt']
+    if global_positive_prompt != "" and global_positive_prompt != None:
+        split_global_positive = global_positive_prompt.split(",")
+        prompt.extend(split_global_positive)
+    
+    
+    if character_count > 0:
+        for index in range(1, character_count + 1):
+            preset_global_positive = state[f'character_{index}']['character_preset_global_positive']
+            if preset_global_positive != '' and preset_global_positive != None:
+                split_preset_global_positive = preset_global_positive.split(",")
+                prompt.extend(split_preset_global_positive)
+
+            if version == 'v3':
+
+                for qw in state[f'character_{index}']['character_positive_quick_weights']:
+                    prompt.append(qw)
+
+                preset_positive = state[f'character_{index}']['character_preset_positive']
+                if preset_positive != None and preset_positive != "":
+                    split_preset_positive = preset_positive.split(",")
+                    prompt.extend(split_preset_positive)
+
+                prompt_positive = state[f'character_{index}']['character_positive_prompt']
+                if prompt_positive != "" and prompt_positive != None:
+                    split_prompt_positive = prompt_positive.split(",")
+                    prompt.extend(split_prompt_positive)
+
+    if preset != '' and preset != None:
+        if target == 'end':
+            split_preset = preset.split(",")
+            prompt.extend(split_preset)
+        elif target == 'start':
+            split_preset = preset.split(",")
+            for item in reversed(split_preset):
+                prompt.insert(0, item)
+    prompt = [tag.strip() for tag in prompt]
+
+    final_prompt = ", ".join(prompt)
+    return final_prompt
+
+def prepare_negative_prompt(state, version):
+    prompt = []
+    preset = state['global_prompt']['global_negative_preset_tags']
+    character_count = state['global_prompt']['character_number']
+
+    global_negative_prompt = state['global_prompt']['global_negative_prompt']
+    if global_negative_prompt != "" and global_negative_prompt != None:
+        split_global_negative = global_negative_prompt.split(",")
+        prompt.extend(split_global_negative)
+    
+    if character_count > 0:
+        for index in range(1, character_count + 1):
+            preset_global_negative = state[f'character_{index}']['character_preset_global_negative']
+            if preset_global_negative != None and preset_global_negative != '':
+                split_preset_global_negative = preset_global_negative.split(",")
+                prompt.extend(split_preset_global_negative)
+
+            if version == 'v3':
+                    
+                    for qw in state[f'character_{index}']['character_negative_quick_weights']:
+                        prompt.append(qw)
+
+                    preset_negative = state[f'character_{index}']['character_preset_negative']
+                    if preset_negative != None and preset_negative != "":
+                        split_preset_negative = preset_negative.split(",")
+                        prompt.extend(split_preset_negative)
+
+                    prompt_negative = state[f'character_{index}']['character_negative_prompt']
+                    if prompt_negative != "" and prompt_negative != None:
+                        split_prompt_negative = prompt_negative.split(",")
+                        prompt.extend(split_prompt_negative)
+    
+    if preset != None and preset != '':
+        prompt.append(preset)
+
+    prompt = [tag.strip() for tag in prompt]
+    final_prompt = ", ".join(prompt)
+    return final_prompt
+
+def prepare_positive_character_prompt(state):
+    character_captions = []
+    character_count = state['global_prompt']['character_number']
+
+    for id in range(1, character_count + 1):
+        if id <= character_count:
+            key = f"character_{id}"
+
+            caption = []
+
+            for weight in state[key]['character_positive_quick_weights']:
+                caption.append(weight)
+
+            preset_positive = state[key]['character_preset_positive']
+            if preset_positive != None and preset_positive != "":
+                split_preset_positive = preset_positive.split(",")
+                caption.extend(split_preset_positive)
+
+            outfit_positive = state[key]['character_outfit_preset_positive']
+            if outfit_positive != None and outfit_positive != "":
+                split_outfit_positive = outfit_positive.split(",")
+                caption.extend(split_outfit_positive)
+
+            prompt_positive = state[key]['character_positive_prompt']
+            if prompt_positive != None and prompt_positive != "":
+                split_prompt_positive = prompt_positive.split(",")
+                caption.extend(split_prompt_positive)
+
+            caption = [tag.strip() for tag in caption]
+
+            caption_set = set(caption)
+            associations_to_add = []
+            associations_to_remove = []
+
+            for association in state[key]['character_tag_associations']:
+                blacklists = association['blacklist']
+                for blacklist in blacklists:
+                    if blacklist in caption_set:
+                        break
+                
+                trigger_found = False
+                triggers = association['trigger']
+                for trigger in triggers:
+                    if trigger in caption_set:
+                        trigger_found = True
+                        break
+
+                if trigger_found:
+                    if association['type'] == 'add':
+                        for tag in association['inject']:
+                            associations_to_add.append(tag)
+
+                    elif association['type'] == 'remove':
+                        for tag in association['inject']:
+                            associations_to_remove.append(tag)
+
+                    elif association['type'] == 'replace':
+                        for tag in association['inject']:
+                            associations_to_add.append(tag)
+                        for tag in association['trigger']:
+                            associations_to_remove.append(tag)
+
+            for tag in associations_to_add:
+                if tag not in caption:
+                    caption.append(tag)
+
+            for tag in associations_to_remove:
+                if tag in caption:
+                    caption.remove(tag)
+
+            joined_caption = ", ".join(caption)
+
+            payload = {
+                "centers": [
+                    {
+                        "x": state[key]['character_x_coordinate'],
+                        "y": state[key]['character_y_coordinate']
+                    }
+                ],
+                "char_caption": joined_caption
+            }
+            character_captions.append(payload)
+    return character_captions
+
+def prepare_negative_character_prompt(state):
+    character_captions = []
+    character_count = state['global_prompt']['character_number']
+
+    for id in range(1, character_count + 1):
+        if id <= character_count:
+            key = f"character_{id}"
+
+            caption = []
+
+            for weight in state[key]['character_negative_quick_weights']:
+                caption.append(weight)
+
+            preset_negative = state[key]['character_preset_negative']
+            if preset_negative != None and preset_negative != "":
+                split_preset_negative = preset_negative.split(",")
+                caption.extend(split_preset_negative)
+
+            outfit_negative = state[key]['character_outfit_preset_negative']
+            if outfit_negative != None and outfit_negative != "":
+                split_outfit_negative = outfit_negative.split(",")
+                caption.extend(split_outfit_negative)
+
+            prompt_negative = state[key]['character_negative_prompt']
+            if prompt_negative != "" and prompt_negative != None:
+                split_prompt_negative = prompt_negative.split(",")
+                caption.extend(split_prompt_negative)   
+
+            joined_caption = ", ".join(caption)
+            
+            payload = {
+                "centers": [
+                    {
+                        "x": state[key]['character_x_coordinate'],
+                        "y": state[key]['character_y_coordinate']
+                    }
+                ],
+                "char_caption": joined_caption
+            }
+            character_captions.append(payload)
+    return character_captions
+
+def generate_seed(state):
+    state_seed = state['generate']['seed']
+    if state_seed > 0:
+        return state_seed
+    else:
+        random_seed = random.randint(1, 4294967295)
+        return random_seed
+    
+def prepare_cfg(state):
+    if state['generate']['variety+']:
+        return state['generate']['variety+_value']
+    else:
+        state_cfg = state['generate']['cfg']
+        if state_cfg >= 0:
+            return state_cfg
+        else:
+            return None
+        
+def prepare_brownian(state):
+    if state['generate']['brownian']:
+        return (True, False)
+    else:
+        return (False, True)
+    
+
+
+    
+
+    

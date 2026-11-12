@@ -1,0 +1,128 @@
+import json
+import os
+import sys
+from pathlib import Path
+
+from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QObject, Signal
+
+from data.paths import CONFIG_DIR, IMAGES_DIR, CHARACTERS_DIR, PRESETS_DIR, PORTRAITS_DIR, REFERENCE_DIR
+from signaling.refresh_character_lists import refresh_character_lists_signal
+
+VALID_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
+
+data_cache: dict = {}
+character_cache: dict = {}
+
+def packaged_path(relative_path: str) -> Path:
+    base_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    return base_dir / relative_path
+
+def _load_json_from_file(json_path: Path) -> dict:
+    with open(json_path, "r", encoding="utf-8") as file_handle:
+        return json.load(file_handle)
+
+def _load_all_json_in_dir(source_dir: Path, target_cache: dict, label: str) -> None:
+    if not source_dir.exists():
+        return
+    for filename in os.listdir(source_dir):
+        if not filename.endswith(".json"):
+            continue
+        key = os.path.splitext(filename)[0]
+        json_path = source_dir / filename
+        try:
+            target_cache[key] = _load_json_from_file(json_path)
+        except Exception as exception:
+            pass
+
+def load_all() -> dict:
+    data_cache.clear()
+
+    bundled_config_dir = packaged_path("data/config")
+    _load_all_json_in_dir(bundled_config_dir, data_cache, "defaults")
+
+    _load_all_json_in_dir(Path(CONFIG_DIR), data_cache, "config")
+
+    _load_all_json_in_dir(Path(PRESETS_DIR), data_cache, "presets")
+
+    return data_cache
+
+def load_characters() -> dict:
+    character_cache.clear()
+
+    characters_dir = Path(CHARACTERS_DIR)
+    if not characters_dir.exists():
+        return character_cache
+
+    for filename in os.listdir(characters_dir):
+        if not filename.endswith(".json"):
+            continue
+
+        file_path = characters_dir / filename
+        try:
+            loaded = _load_json_from_file(file_path)
+        except Exception as exception:
+            continue
+
+        character = loaded[0] if isinstance(loaded, list) and loaded else loaded
+        if not isinstance(character, dict):
+            continue
+
+        character_id = character.get("nameID") or os.path.splitext(filename)[0]
+        character_cache[character_id] = character
+
+    return character_cache
+
+def get_character(character_id, default=None):
+    return character_cache.get(character_id, default)
+
+def get_all_characters():
+    return list(character_cache.values())
+
+def get_data(key, default=None):
+    return data_cache.get(key, default)
+
+def load_image_tree() -> dict:
+    image_tree: dict = {}
+
+    def pick_root(disk_path: Path, packaged_relative: str) -> Path:
+        if disk_path.exists():
+            return disk_path
+        bundled = packaged_path(packaged_relative)
+        return bundled if bundled.exists() else disk_path
+
+    root_definitions = [
+        ("images", pick_root(Path(IMAGES_DIR), "images")),
+        ("references", pick_root(Path(REFERENCE_DIR), "references")),
+        ("portraits", pick_root(Path(PORTRAITS_DIR), "images/character_portraits")),
+    ]
+
+    def add_root_to_tree(root_name: str, root_path: Path) -> None:
+        if not root_path.exists():
+            return
+
+        root_level = image_tree.setdefault(root_name, {})
+
+        for file_path in root_path.rglob("*"):
+            if not file_path.is_file():
+                continue
+            if file_path.suffix.lower() not in VALID_IMAGE_EXTENSIONS:
+                continue
+
+            relative_path = file_path.relative_to(root_path)
+            path_parts = relative_path.parts
+            name_without_extension = file_path.stem
+
+            current_level = root_level
+            for folder_name in path_parts[:-1]:
+                current_level = current_level.setdefault(folder_name, {})
+
+            current_level[name_without_extension] = str(file_path)
+
+    for root_name, root_path in root_definitions:
+        add_root_to_tree(root_name, root_path)
+
+    return image_tree
+
+
+refresh_character_lists_signal.reload_character_data.connect(lambda: load_characters())
